@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
+import { getCurrentUser, saveQuizResult, updateUserProgress } from "@/app/lib/dbClient";
 import {
   nivel1Questions,
   nivel1Feedback,
@@ -12,7 +12,8 @@ import {
   nivel3Questions,
   nivel3Feedback,
   type Question,
-} from "../../lib/questionsData";
+} from "@/app/lib/questionsData";
+import type { UserData } from "@/app/lib/dbClient";
 
 const QUESTIONNAIRES: Record<
   string,
@@ -47,12 +48,12 @@ export default function CuestionarioPage() {
   const router = useRouter();
   const params = useParams();
   const cuestionarioId = params.id as string;
+  const [user, setUser] = useState<UserData | null>(null);
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<(string | null)[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
-  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const questionnaire = QUESTIONNAIRES[cuestionarioId] || QUESTIONNAIRES["nivel-1"];
@@ -63,12 +64,12 @@ export default function CuestionarioPage() {
   }, []);
 
   async function checkAuth() {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      router.push("/login");
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      router.push("/access-code");
       return;
     }
-    setUser(data.session.user);
+    setUser(currentUser);
     setLoading(false);
     setAnswers(new Array(questions.length).fill(null));
   }
@@ -93,7 +94,10 @@ export default function CuestionarioPage() {
 
   async function handleSubmit() {
     let correctCount = 0;
+    const answersRecord: Record<string, string | null> = {};
+    
     answers.forEach((answer, index) => {
+      answersRecord[index.toString()] = answer;
       if (answer === questions[index].correctAnswer) {
         correctCount++;
       }
@@ -104,16 +108,9 @@ export default function CuestionarioPage() {
     setShowResults(true);
 
     // Guardar resultado en Supabase
-    if (user) {
-      await supabase.from("quiz_results").insert([
-        {
-          user_id: user.id,
-          quiz_id: cuestionarioId,
-          score: finalScore,
-          answers: answers,
-          created_at: new Date(),
-        },
-      ]);
+    if (user && user.id) {
+      await saveQuizResult(user.id, cuestionarioId, finalScore, answersRecord);
+      await updateUserProgress(user.id, cuestionarioId, true, finalScore);
     }
   }
 

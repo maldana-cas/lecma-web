@@ -42,12 +42,12 @@ export default function Home() {
 
           {/* BOTONES CONECTADOS */}
           <div className="flex justify-center gap-4">
-            {/* Ir al Dashboard/Registrarse */}
+            {/* Ir a Código de Acceso */}
             <a
-              href="/register"
+              href="/access-code"
               className="px-8 py-3 rounded-2xl bg-[#3b82f6] text-white font-semibold shadow-md hover:opacity-90"
             >
-              Registrarse gratis
+              Ingresar con Código
             </a>
 
             {/* Login conectado */}

@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import { getCurrentUser, logout } from "@/app/lib/dbClient";
+import type { UserData } from "@/app/lib/dbClient";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -14,18 +15,18 @@ export default function DashboardPage() {
   }, []);
 
   async function checkAuth() {
-    const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      router.push("/login");
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      router.push("/access-code");
       return;
     }
-    setUser(data.session.user);
+    setUser(currentUser);
     setLoading(false);
   }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    router.push("/");
+  function handleLogout() {
+    logout();
+    router.push("/access-code");
   }
 
   if (loading) {
@@ -44,7 +45,7 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-[#3b3b5c]">LECMA</h1>
           <div className="flex items-center gap-6">
             <p className="text-[#5c5c7a]">
-              Bienvenido, <span className="font-semibold">{user?.email}</span>
+              Bienvenido, <span className="font-semibold">{user?.nombre} {user?.apellido}</span>
             </p>
             <button
               onClick={handleLogout}
