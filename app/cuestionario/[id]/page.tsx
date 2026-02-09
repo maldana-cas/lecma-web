@@ -55,9 +55,12 @@ export default function CuestionarioPage() {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
 
   const questionnaire = QUESTIONNAIRES[cuestionarioId] || QUESTIONNAIRES["nivel-1"];
   const questions = questionnaire.questions;
+  const storageKey = `quiz_${cuestionarioId}_answers`;
+  const currentPosKey = `quiz_${cuestionarioId}_position`;
 
   useEffect(() => {
     checkAuth();
@@ -71,24 +74,64 @@ export default function CuestionarioPage() {
     }
     setUser(currentUser);
     setLoading(false);
+
+    // Verificar si hay respuestas guardadas en localStorage
+    if (typeof window !== "undefined") {
+      const savedAnswers = localStorage.getItem(storageKey);
+      if (savedAnswers) {
+        setShowResumeDialog(true);
+        setAnswers(JSON.parse(savedAnswers));
+        const savedPos = localStorage.getItem(currentPosKey);
+        if (savedPos) {
+          setCurrentQuestion(parseInt(savedPos));
+        }
+      } else {
+        setAnswers(new Array(questions.length).fill(null));
+      }
+    } else {
+      setAnswers(new Array(questions.length).fill(null));
+    }
+  }
+
+  function handleResume() {
+    setShowResumeDialog(false);
+  }
+
+  function handleStartNew() {
+    localStorage.removeItem(storageKey);
+    localStorage.removeItem(currentPosKey);
     setAnswers(new Array(questions.length).fill(null));
+    setCurrentQuestion(0);
+    setShowResumeDialog(false);
   }
 
   function handleAnswerSelect(optionLetter: string) {
     const newAnswers = [...answers];
     newAnswers[currentQuestion] = optionLetter;
     setAnswers(newAnswers);
+
+    // Guardar en localStorage
+    if (typeof window !== "undefined") {
+      localStorage.setItem(storageKey, JSON.stringify(newAnswers));
+      localStorage.setItem(currentPosKey, currentQuestion.toString());
+    }
   }
 
   function handleNext() {
     if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(currentPosKey, (currentQuestion + 1).toString());
+      }
     }
   }
 
   function handlePrevious() {
     if (currentQuestion > 0) {
       setCurrentQuestion(currentQuestion - 1);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(currentPosKey, (currentQuestion - 1).toString());
+      }
     }
   }
 
@@ -112,12 +155,50 @@ export default function CuestionarioPage() {
       await saveQuizResult(user.id, cuestionarioId, finalScore, answersRecord);
       await updateUserProgress(user.id, cuestionarioId, true, finalScore);
     }
+
+    // Limpiar localStorage después de enviar
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(storageKey);
+      localStorage.removeItem(currentPosKey);
+    }
   }
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p className="text-xl font-semibold">Cargando...</p>
+      </div>
+    );
+  }
+
+  // Mostrar diálogo si hay respuestas guardadas
+  if (showResumeDialog) {
+    return (
+      <div className="min-h-screen bg-[#f7f8fc] flex items-center justify-center px-6 py-10">
+        <div className="bg-white rounded-3xl shadow-xl p-10 max-w-md w-full text-center">
+          <h1 className="text-2xl font-bold text-[#3b3b5c] mb-4">Cuestionario Encontrado</h1>
+          <p className="text-[#5c5c7a] mb-2">
+            Encontramos respuestas guardadas en pregunta <span className="font-bold">{currentQuestion + 1}</span> de {questions.length}
+          </p>
+          <p className="text-sm text-gray-500 mb-8">
+            ¿Deseas continuar desde donde dejaste o empezar de nuevo?
+          </p>
+
+          <div className="flex gap-4">
+            <button
+              onClick={handleStartNew}
+              className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-xl transition"
+            >
+              Empezar de Nuevo
+            </button>
+            <button
+              onClick={handleResume}
+              className="flex-1 bg-[#3b82f6] hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition"
+            >
+              Continuar
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
